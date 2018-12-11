@@ -1,3 +1,4 @@
+:- use_module(library(pio)).
 /**********************************************************************************************************************/
 % All the functions that deal with the deck and all the helper functions
 /**********************************************************************************************************************/
@@ -63,7 +64,7 @@ makeMove(Tournament, 2) :-
     captureCards(Tournament, Board, HumanHand, HumanPile, Card, NewBoard, NewHumanHand, NewHumanPile),
     insertBoardHumanHandAndPile(Tournament, NewBoard, NewHumanHand, NewHumanPile, UpdatedTournament),
     getDeckAndHands(UpdatedTournament, Deck, TournamentHumanHand, TournamentComputerHand),
-    playRound(UpdatedTournament, "Computer", "", Deck, TournamentHumanHand, TournamentComputerHand).
+    playRound(UpdatedTournament, computer, "You captured a card", Deck, TournamentHumanHand, TournamentComputerHand).
 
 makeMove(Tournament, 3) :-
     extractBoardHumanHandAndPile(Tournament, Board, HumanHand, HumanPile),
@@ -75,7 +76,7 @@ makeMove(Tournament, 3) :-
     trailCard(Board, HumanHand, Card, NewBoard, NewHumanHand),
     insertBoardHumanHandAndPile(Tournament, NewBoard, NewHumanHand, HumanPile, UpdatedTournament),
     getDeckAndHands(UpdatedTournament, Deck, TournamentHumanHand, TournamentComputerHand),
-    playRound(UpdatedTournament, "Computer", "", Deck, TournamentHumanHand, TournamentComputerHand).
+    playRound(UpdatedTournament, computer, "You trailed a card", Deck, TournamentHumanHand, TournamentComputerHand).
 
 makeMove(Tournament, 4) :-
     write("You've played Casino long enough, you don't need help\n"),
@@ -166,7 +167,7 @@ makeComputerMove(Tournament) :-
     trailCard(Board, ComputerHand, FirstCard, NewBoard, NewComputerHand),
     insertBoardComputerHandAndPile(Tournament, NewBoard, NewComputerHand, ComputerPile, UpdatedTournament),
     getDeckAndHands(UpdatedTournament, Deck, HumanHand, UpdatedComputerHand),
-    playRound(UpdatedTournament, "Human", "The Computer trailed", Deck, HumanHand, UpdatedComputerHand).
+    playRound(UpdatedTournament, human, "The Computer trailed", Deck, HumanHand, UpdatedComputerHand).
 
 
 extractBoardComputerHandAndPile(Tournament, Board, ComputerHand, ComputerPile) :-
@@ -205,6 +206,7 @@ removeListFromList(ListToRemoveFrom, [FirstElem | RestofList], UpdatedList) :-
 %***********************************************************************************************************************
 captureCards(Tournament, Board, HuamnHand, HumanPile, Card, NewBoard, NewHumanHand, NewHumanPile) :-
     displayNumbericalList(0, Board),
+    write("\nEnter the number of the card to capture, or 100 to exit"),
     read(Input),
     getCards(Board, CaptureCards, Input),
     sumTotal(CaptureCards, Total),
@@ -232,25 +234,39 @@ trailCard(Board, Hand, Card, NewBoard, NewHand) :-
 %***********************************************************************************************************************
 % All the functions that deal with the Round
 %***********************************************************************************************************************
-playRound(_, _, _, [], [], []).
+playRound(Tournament, _, _, [], [], []) :-
+    nth0(8, Tournament, LastCapture),
+    nth0(7, Tournament, Board),
+    addBoardToPile(Tournament, Board, LastCapture, UpdatedTournament),
+    endScreen(UpdatedTournament).
 
 playRound(Tournament, NextPlayer, Message, Deck, [], []) :-
     refreshHands(Tournament, Deck, UpdatedTournament, UpdatedDeck, HumanHand, ComputerHand),
     playRound(UpdatedTournament, NextPlayer, Message, UpdatedDeck, HumanHand, ComputerHand).
 
-playRound(Tournament, "Human", Message, _, _, _) :-
+playRound(Tournament, human, Message, _, _, _) :-
     updateDisplayScreen(Tournament, Message),
     write("Would you like to Save (y/n)"),
     read(SaveCommand),
     saveGame(Tournament, SaveCommand),
     makeMove(Tournament, 5).
 
-playRound(Tournament, "Computer", Message, _, _, _) :-
+playRound(Tournament, computer, Message, _, _, _) :-
     updateDisplayScreen(Tournament, Message),
     write("Would you like to Save (y/n)"),
     read(SaveCommand),
     saveGame(Tournament, SaveCommand),
     makeComputerMove(Tournament).
+
+addBoardToPile(Tournament, Board, human, UpdatedTournament):-
+    nth0(6, Tournament, HumanPile),
+    append(HumanPile, Board, UpdatedPile),
+    insertIntoTournament(6, Tournament, UpdatedPile, UpdatedTournament).
+
+addBoardToPile(Tournament, Board, omputer, UpdatedTournament):-
+    nth0(3, Tournament, HumanPile),
+    append(HumanPile, Board, UpdatedPile),
+    insertIntoTournament(3, Tournament, UpdatedPile, UpdatedTournament).
 
 getDeckAndHands(Tournament, Deck, HumanHand, ComputerHand) :-
     nth0(9, Tournament, Deck),
@@ -315,33 +331,89 @@ playTournament(Tournament) :-
     getDeckAndHands(Tournament, Deck, HumanHand, ComputerHand),
     playRound(Tournament, NextPlayer, "", Deck, HumanHand, ComputerHand).
 
+resetTournament(Tournament, UpdatedTournament) :-
+    nth0(0, Tournament, Round),
+    nth0(1, Tournament, ComputerScore),
+    nth0(4, Tournament, HumanScore),
+    nth0(8, Tournament, NextPlayer),
+    createTournament(NewTournament),
+    NextRound is Round + 1,
+    insertIntoTournament(0, NewTournament, NextRound, NewTournament0),
+    insertIntoTournament(1, NewTournament0, ComputerScore, NewTournament1),
+    insertIntoTournament(4, NewTournament1, HumanScore, NewTournament2),
+    insertIntoTournament(8, NewTournament2, NextPlayer, NewTournament3),
+    insertIntoTournament(10, NewTournament3, NextPlayer, UpdatedTournament).
+
 saveGame(_, y) :-
     halt(0).
 
 saveGame(_, _).
 
+endScreen(Tournament) :-
+    write('\33\[2J'),
+    nth0(1, Tournament, ComputerScore),
+    nth0(3, Tournament, ComputerPile),
+    %calculatepoints(ComputerPile, ComputerScore, UpdatedComputerScore),
+    format("\n\nComputer Score:\t ~d", ComputerScore),
+    write("\n\nComputerPile:\n"),
+    displayList(ComputerPile), 
+    write("\n\n\n"),
+    nth0(4, Tournament, HumanScore),
+    nth0(6, Tournament, HumanPile),
+    %calculatepoints(HumanPile, HumanScore, UpdatedHumanScore),
+    displayList(HumanPile),
+    write("\n\nHumanPile:\n"),
+    format("Human Score:\t ~d", HumanScore),
+
+    write("\nPress any key to continue"),
+    read(_),
+    resetTournament(Tournament, UpdatedTournament),
+    playTournament(UpdatedTournament).
+
 coinFlip(1, h, Tournament, NewNewTournament):-
     write("\nYou won the coin toss\n"),
-    insertIntoTournament(8, Tournament, "Human", NewTournament),
-    insertIntoTournament(10, NewTournament, "Human", NewNewTournament).
+    insertIntoTournament(8, Tournament, human, NewTournament),
+    insertIntoTournament(10, NewTournament, human, NewNewTournament).
 
 coinFlip(0, t, Tournament, NewNewTournament):-
     write("\nYou won the coin toss\n"),
-    insertIntoTournament(8, Tournament, "Human", NewTournament),
-    insertIntoTournament(10, NewTournament, "Human", NewNewTournament).
+    insertIntoTournament(8, Tournament, human, NewTournament),
+    insertIntoTournament(10, NewTournament, human, NewNewTournament).
 
 coinFlip(_, _, Tournament, NewNewTournament):-
     write("\nThe Computer won the coin toss\n"),
-    insertIntoTournament(8, Tournament, "Computer", NewTournament),
-    insertIntoTournament(10, NewTournament, "Computer", NewNewTournament).
+    insertIntoTournament(8, Tournament, computer, NewTournament),
+    insertIntoTournament(10, NewTournament, computer, NewNewTournament).
 
 %_________________________________MAIN FUNCTION THAT IS CALLED__________________________________________________________
+loadGame() :-
+    write("Enter the name of the file you want to load"),
+    read(File),
+    open(File, read, Stream),
+    read(Stream, Tournament),
+    playTournament(Tournament).
+    
+createGame() :-
+    createTournament(Tournament),
+    write("Enter 'h' for Heads and 't' for tails\t"),
+    read(CoinFlip),
+    random_between(0, 2, R),
+    coinFlip(R, CoinFlip, Tournament, NewTournament),
+    playTournament(NewTournament).
+
+loadOrCreate(l) :-
+    loadGame().
+
+loadOrCreate(c) :-
+    createGame().
+
+loadOrCreate(_) :-
+    write("Error enter l or c\t"),
+    read(Input),
+    loadOrCreate(Input).
+
 main() :-
     write('\33\[2J'),
-    createTournament(Tournament),
-    write(Tournament),
-   % write("Enter 'h' for Heads and 't' for tails\t"),
-   % read(CoinFlip),
-   % random_between(0, 2, R),
-   % coinFlip(R, CoinFlip, Tournament, NewTournament),
-    playTournament(Tournament).
+    write("Would you like to create a new game or load a save game (l/c)\t"),
+    read(Input),
+    loadOrCreate(Input).
