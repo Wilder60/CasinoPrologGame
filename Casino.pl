@@ -1,4 +1,3 @@
-:- use_module(library(pio)).
 /**********************************************************************************************************************/
 % All the functions that deal with the deck and all the helper functions
 /**********************************************************************************************************************/
@@ -63,8 +62,9 @@ makeMove(Tournament, 2) :-
     nth0(Input, HumanHand, Card),
     captureCards(Tournament, Board, HumanHand, HumanPile, Card, NewBoard, NewHumanHand, NewHumanPile),
     insertBoardHumanHandAndPile(Tournament, NewBoard, NewHumanHand, NewHumanPile, UpdatedTournament),
-    getDeckAndHands(UpdatedTournament, Deck, TournamentHumanHand, TournamentComputerHand),
-    playRound(UpdatedTournament, computer, "You captured a card", Deck, TournamentHumanHand, TournamentComputerHand).
+    insertIntoTournament(8, UpdatedTournament, human, FinalUpdatedTournament),
+    getDeckAndHands(FinalUpdatedTournament, Deck, TournamentHumanHand, TournamentComputerHand),
+    playRound(FinalUpdatedTournament, computer, "You captured a card", Deck, TournamentHumanHand, TournamentComputerHand).
 
 makeMove(Tournament, 3) :-
     extractBoardHumanHandAndPile(Tournament, Board, HumanHand, HumanPile),
@@ -73,6 +73,7 @@ makeMove(Tournament, 3) :-
     read(Input),
     isVaildSelection(HumanHand, Input),
     nth0(Input, HumanHand, Card),
+    isVaildTrail(Tournament, Board, Card),
     trailCard(Board, HumanHand, Card, NewBoard, NewHumanHand),
     insertBoardHumanHandAndPile(Tournament, NewBoard, NewHumanHand, HumanPile, UpdatedTournament),
     getDeckAndHands(UpdatedTournament, Deck, TournamentHumanHand, TournamentComputerHand),
@@ -132,32 +133,19 @@ sumTotal([FirstCard | RestofList], Total) :-
     getValue(FirstCard, Value),
     Total = Value + NewTotal.
 
-getValue([_, a], Value) :-
-    Value = 1.
-getValue([_, 2], Value) :-
-    Value = 2.
-getValue([_, 3], Value) :-
-    Value = 3.
-getValue([_, 4], Value) :-
-    Value = 4.
-getValue([_, 5], Value) :-
-    Value = 5.
-getValue([_, 6], Value) :-
-    Value = 6.
-getValue([_, 7], Value) :-
-    Value = 7.
-getValue([_, 8], Value) :-
-    Value = 8.
-getValue([_, 9], Value) :-
-    Value = 9.
-getValue([_, x], Value) :-
-    Value = 10.
-getValue([_, j], Value) :-
-    Value = 11.
-getValue([_, q], Value) :-
-    Value = 12.
-getValue([_, k], Value) :-
-    Value = 13.
+getValue([_, a], 1).
+getValue([_, 2], 2).
+getValue([_, 3], 3).
+getValue([_, 4], 4).
+getValue([_, 5], 5).
+getValue([_, 6], 6).
+getValue([_, 7], 7).
+getValue([_, 8], 8).
+getValue([_, 9], 9).
+getValue([_, x], 10).
+getValue([_, j], 11).
+getValue([_, q], 12).
+getValue([_, k], 13).
 
 %***********************************************************************************************************************
 
@@ -168,7 +156,6 @@ makeComputerMove(Tournament) :-
     insertBoardComputerHandAndPile(Tournament, NewBoard, NewComputerHand, ComputerPile, UpdatedTournament),
     getDeckAndHands(UpdatedTournament, Deck, HumanHand, UpdatedComputerHand),
     playRound(UpdatedTournament, human, "The Computer trailed", Deck, HumanHand, UpdatedComputerHand).
-
 
 extractBoardComputerHandAndPile(Tournament, Board, ComputerHand, ComputerPile) :-
     nth0(7, Tournament, Board),
@@ -202,7 +189,6 @@ removeListFromList(ListToRemoveFrom, [FirstElem | RestofList], UpdatedList) :-
     removeCardFromList(ListToRemoveFrom, FirstElem, NewList),
     removeListFromList(NewList, RestofList, UpdatedList).
 
-
 %***********************************************************************************************************************
 captureCards(Tournament, Board, HuamnHand, HumanPile, Card, NewBoard, NewHumanHand, NewHumanPile) :-
     displayNumbericalList(0, Board),
@@ -224,13 +210,25 @@ isVaildCapture(Tournament, _) :-
     write("Error, Invalid Capture set!"),
     makeMove(Tournament, 5).
 
-
 trailCard(Board, Hand, Card, NewBoard, NewHand) :-
     append(Board, [Card], UpdatedBoard),
     removeCardFromList(Hand, Card, UpdatedHand),
     NewBoard = UpdatedBoard,
     NewHand = UpdatedHand.
     
+isVaildTrail(_, [], _).
+
+isVaildTrail(Tournament, [FirstCard|RestofDeck], Card):-
+    sameValue(Tournament, FirstCard, Card),
+    isVaildTrail(Tournament, RestofDeck, Card).
+
+sameValue(Tournament, [_, Value], [_, Value]) :-
+    write("Error you can not trail with matching loose cards on the table\n"),
+    makeMove(Tournament, 5).
+
+sameValue(_, _, _).
+
+
 %***********************************************************************************************************************
 % All the functions that deal with the Round
 %***********************************************************************************************************************
@@ -353,22 +351,111 @@ endScreen(Tournament) :-
     write('\33\[2J'),
     nth0(1, Tournament, ComputerScore),
     nth0(3, Tournament, ComputerPile),
-    %calculatepoints(ComputerPile, ComputerScore, UpdatedComputerScore),
-    format("\n\nComputer Score:\t ~d", ComputerScore),
+    nth0(4, Tournament, HumanScore),
+    nth0(6, Tournament, HumanPile),
+    calculatepoints(ComputerPile, ComputerScore, UpdatedComputerScore, HumanPile, HumanScore, UpdatedHumanScore),
+    format("\n\nComputer Score:\t ~d", UpdatedComputerScore),
     write("\n\nComputerPile:\n"),
     displayList(ComputerPile), 
     write("\n\n\n"),
-    nth0(4, Tournament, HumanScore),
-    nth0(6, Tournament, HumanPile),
-    %calculatepoints(HumanPile, HumanScore, UpdatedHumanScore),
     displayList(HumanPile),
     write("\n\nHumanPile:\n"),
-    format("Human Score:\t ~d", HumanScore),
+    format("Human Score:\t ~d", UpdatedHumanScore),
 
     write("\nPress any key to continue"),
     read(_),
+    winGame(UpdatedHumanScore, UpdatedComputerScore),
     resetTournament(Tournament, UpdatedTournament),
-    playTournament(UpdatedTournament).
+    insertScores(UpdatedTournament, UpdatedHumanScore, UpdatedComputerScore, FinalTournametUpdate),
+    playTournament(FinalTournametUpdate).
+
+calculatepoints(ComputerPile, ComputerScore, UpdatedComputerScore, HumanPile, HumanScore, UpdatedHumanScore) :-
+    length(ComputerPile, CPilelen),
+    length(HumanPile, HPileLen),
+    biggerPile(CPilelen, HPileLen, ComputerScore, HumanScore, TempCScore, TempHScore),
+    totalScore(ComputerPile, TempCScore, TempCValue),
+    totalScore(HumanPile, TempHScore, TempHValue),
+    totalClubs(ComputerPile, 0, ComputerClubs),
+    totalClubs(HumanPile, 0, HumanClubs),
+    moreClubs(ComputerClubs, HumanClubs, TempCValue, TempHValue, UpdatedComputerScore, UpdatedHumanScore).
+
+biggerPile(CPilelen, HPileLen, ComputerScore, HumanScore, TempCScore, TempHScore) :-
+    CPilelen > HPileLen,
+    TempCScore is ComputerScore + 3,
+    TempHScore is HumanScore.
+
+biggerPile(CPilelen, HPileLen, ComputerScore, HumanScore, TempCScore, TempHScore) :-
+    CPilelen < HPileLen,
+    TempHScore is HumanScore + 3,
+    TempCScore is ComputerScore.
+
+biggerPile(CPilelen, HPileLen, ComputerScore, HumanScore, TempCScore, TempHScore) :-
+    CPilelen =:= HPileLen,
+    TempCScore is ComputerScore,
+    TempHScore is HumanScore.
+
+totalScore([], TempScore, Value) :-
+    Value = TempScore.
+
+totalScore([FirstCard | RestofPile], TempScore, Value) :-
+    getPoints(FirstCard, Points),
+    NewTempScore is TempScore + Points,
+    totalScore(RestofPile, NewTempScore, Value).
+
+getPoints([d,x], 2).
+getPoints([s,2], 1).
+getPoints([_,a], 1).
+getPoints([_,_], 0).
+
+totalClubs([], TempClubs, Total) :-
+    Total = TempClubs.
+
+totalClubs([FirstCard | RestofPile], TempClubs, Total) :-
+    getClubs(FirstCard, Value),
+    NewTempClubs is TempClubs + Value,
+    totalClubs(RestofPile, NewTempClubs, Total).
+
+getClubs([c,_], 1).
+getClubs([_,_], 0).
+
+moreClubs(CClubs, HClubs, TempCScore, TempHScore, UpdatedComputerScore, UpdatedHumanScore) :-
+    CClubs > HClubs,
+    UpdatedComputerScore is TempCScore + 1,
+    UpdatedHumanScore = TempHScore.
+
+moreClubs(CClubs, HClubs, TempCScore, TempHScore, UpdatedComputerScore, UpdatedHumanScore) :-
+    CClubs < HClubs,
+    UpdatedHumanScore is TempHScore + 1,
+    UpdatedComputerScore = TempCScore.
+
+moreClubs(CClubs, HClubs, TempCScore, TempHScore, UpdatedComputerScore, UpdatedHumanScore) :-
+    CClubs =:= HClubs,
+    UpdatedComputerScore = TempCScore,
+    UpdatedHumanScore = TempHScore.
+
+insertScores(UpdatedTournament, UpdatedHumanScore, UpdatedComputerScore, FinalTournametUpdate) :-
+    insertIntoTournament(4, UpdatedTournament, UpdatedHumanScore, NewTournament),
+    insertIntoTournament(1, NewTournament, UpdatedComputerScore, FinalTournametUpdate).
+
+winGame(HumanScore, ComputerScore) :-
+    ComputerScore > 20,
+    ComputerScore > HumanScore,
+    write("\n\nThe Computer has won!"),
+    halt(0).
+
+winGame(HumanScore, ComputerScore) :-
+    HumanScore > 20,
+    ComputerScore < HumanScore,
+    write("The Human has won!"),
+    halt(0).
+
+winGame(HumanScore, ComputerScore) :-
+    HumanScore > 20,
+    ComputerScore =:= HumanScore,
+    write("The Game has ended in a time!"),
+    halt(0).
+
+winGame(_,_).
 
 coinFlip(1, h, Tournament, NewNewTournament):-
     write("\nYou won the coin toss\n"),
