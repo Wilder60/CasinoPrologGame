@@ -64,7 +64,8 @@ makeMove(Tournament, 2) :-
     insertBoardHumanHandAndPile(Tournament, NewBoard, NewHumanHand, NewHumanPile, UpdatedTournament),
     insertIntoTournament(8, UpdatedTournament, human, FinalUpdatedTournament),
     getDeckAndHands(FinalUpdatedTournament, Deck, TournamentHumanHand, TournamentComputerHand),
-    playRound(FinalUpdatedTournament, computer, "You captured a card", Deck, TournamentHumanHand, TournamentComputerHand).
+    insertIntoTournament(10, FinalUpdatedTournament, computer, NewFinalUpdatedTournament),
+    playRound(NewFinalUpdatedTournament, computer, "You captured a card", Deck, TournamentHumanHand, TournamentComputerHand).
 
 makeMove(Tournament, 3) :-
     extractBoardHumanHandAndPile(Tournament, Board, HumanHand, HumanPile),
@@ -77,7 +78,8 @@ makeMove(Tournament, 3) :-
     trailCard(Board, HumanHand, Card, NewBoard, NewHumanHand),
     insertBoardHumanHandAndPile(Tournament, NewBoard, NewHumanHand, HumanPile, UpdatedTournament),
     getDeckAndHands(UpdatedTournament, Deck, TournamentHumanHand, TournamentComputerHand),
-    playRound(UpdatedTournament, computer, "You trailed a card", Deck, TournamentHumanHand, TournamentComputerHand).
+    insertIntoTournament(10, UpdatedTournament, computer, NewFinalUpdatedTournament),
+    playRound(NewFinalUpdatedTournament, computer, "You trailed a card", Deck, TournamentHumanHand, TournamentComputerHand).
 
 makeMove(Tournament, 4) :-
     write("You've played Casino long enough, you don't need help\n"),
@@ -111,6 +113,8 @@ isVaildSelection(HumanHand, Input) :-
     length(HumanHand, MAX),
     Input > -1,
     Input < MAX.
+getCards([], CapturedCards, _) :-
+    CapturedCards = [].
 
 getCards(_, CapturedCards, 100) :-
     CapturedCards = [].
@@ -155,7 +159,8 @@ makeComputerMove(Tournament) :-
     trailCard(Board, ComputerHand, FirstCard, NewBoard, NewComputerHand),
     insertBoardComputerHandAndPile(Tournament, NewBoard, NewComputerHand, ComputerPile, UpdatedTournament),
     getDeckAndHands(UpdatedTournament, Deck, HumanHand, UpdatedComputerHand),
-    playRound(UpdatedTournament, human, "The Computer trailed", Deck, HumanHand, UpdatedComputerHand).
+    insertIntoTournament(10, UpdatedTournament, human, FinalUpdatedTournament),
+    playRound(FinalUpdatedTournament, human, "The Computer trailed", Deck, HumanHand, UpdatedComputerHand).
 
 extractBoardComputerHandAndPile(Tournament, Board, ComputerHand, ComputerPile) :-
     nth0(7, Tournament, Board),
@@ -195,20 +200,48 @@ captureCards(Tournament, Board, HuamnHand, HumanPile, Card, NewBoard, NewHumanHa
     write("\nEnter the number of the card to capture, or 100 to exit"),
     read(Input),
     getCards(Board, CaptureCards, Input),
+    checkCardsForValidValues(Tournament, CaptureCards, Card),
     sumTotal(CaptureCards, Total),
     getValue(Card, CardValue),
     Check is mod(Total, CardValue),
     isVaildCapture(Tournament, Check),
-    append(HumanPile, CaptureCards, UpdatedPile),
-    append(UpdatedPile, [Card], NewHumanPile),
+    removeListFromList(Board, CaptureCards, NewBoard),
     removeCardFromList(HuamnHand, Card, NewHumanHand),
-    removeListFromList(Board, CaptureCards, NewBoard).
+    noSameCards(Tournament, NewBoard, Card),
+    append(HumanPile, CaptureCards, UpdatedPile),
+    append(UpdatedPile, [Card], NewHumanPile).
 
 isVaildCapture(_, 0).
 
 isVaildCapture(Tournament, _) :-
     write("Error, Invalid Capture set!"),
     makeMove(Tournament, 5).
+
+checkCardsForValidValues(_, [],_).
+
+checkCardsForValidValues(Tournament, [FirstCard | RestofDeck], Card) :-
+    biggerValue(Tournament, FirstCard, Card),
+    checkCardsForValidValues(Tournament, RestofDeck, Card).
+
+biggerValue(Tournament, [_, Value1], [_, Value2]) :-
+    Value1 > Value2,
+    write("\nInvalid card in capture pile!\n\n"),
+    makeMove(Tournament, 5).
+
+biggerValue(_, [_, Value1], [_, Value2]) :-
+    Value1 =< Value2.
+
+noSameCards(_, [], _).
+
+noSameCards(Tournament, [FirstCard | RestofBoard], Card) :-
+    sameCardValue(Tournament, FirstCard, Card),
+    noSameCards(Tournament, RestofBoard, Card).
+
+sameCardValue(Tournament, [_, Value1], [_, Value1]) :-
+    write("\n\nThere are cards on the table you need to capture\n\n"),
+    makeMove(Tournament, 5).
+
+sameCardValue(_, [_, _], [_, _] ).
 
 trailCard(Board, Hand, Card, NewBoard, NewHand) :-
     append(Board, [Card], UpdatedBoard),
@@ -342,7 +375,11 @@ resetTournament(Tournament, UpdatedTournament) :-
     insertIntoTournament(8, NewTournament2, NextPlayer, NewTournament3),
     insertIntoTournament(10, NewTournament3, NextPlayer, UpdatedTournament).
 
-saveGame(_, y) :-
+saveGame(Tournament, y) :-
+    open('SaveGamed.txt', append, Str),
+    write(Str, Tournament),
+    write(Str, '.'),
+    close(Str),
     halt(0).
 
 saveGame(_, _).
@@ -478,6 +515,7 @@ loadGame() :-
     read(File),
     open(File, read, Stream),
     read(Stream, Tournament),
+    close(Stream),
     playTournament(Tournament).
     
 createGame() :-
